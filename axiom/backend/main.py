@@ -1,3 +1,16 @@
+import multiprocessing
+import sys
+# Must run before any other imports: PyInstaller-frozen executables that
+# spawn subprocesses (torch/sentence-transformers can) need this guard on
+# Windows or they'll re-launch the whole app in a fork bomb.
+multiprocessing.freeze_support()
+
+# The bundled exe's stdout/stderr default to the console's codepage (cp1252
+# on Windows), which can't encode the emoji in this file's print()s and
+# crashes startup. Force UTF-8 regardless of what's attached to the streams.
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,6 +19,7 @@ from indexer import (
     init_db, simple_search, semantic_search, hybrid_search,
     get_config, set_config, get_default_root, DEFAULT_EXCLUDES
 )
+from service import start_watcher_background
 
 app = FastAPI()
 
@@ -26,6 +40,7 @@ app.add_middleware(
 def startup():
     print("⚡ Initializing DB...")
     init_db()
+    start_watcher_background()
     print("✅ Ready")
 
 
@@ -86,3 +101,8 @@ def set_config_endpoint(payload: ConfigPayload):
     if payload.exclude_patterns is not None:
         set_config("exclude_patterns", payload.exclude_patterns)
     return {"status": "saved"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)

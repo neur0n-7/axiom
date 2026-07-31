@@ -1,1 +1,0 @@
-schtasks /Create /TN "AxiomIndexer" /SC ONLOGON /RL HIGHEST /F /TR "python C:\Users\anish\Desktop\axiom\axiom-backend\service.py"

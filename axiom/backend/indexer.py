@@ -1,10 +1,26 @@
 import os
+import sys
 import sqlite3
 import json
 import numpy as np
 
 ALLOWED_EXTENSIONS = {".txt", ".py", ".md", ".json", ".js", ".ts"}
-DB_PATH = "data/index.db"
+
+
+def get_app_dir():
+    """Directory the backend's data lives next to.
+
+    When frozen by PyInstaller (running as a Tauri sidecar), the process's
+    CWD isn't reliable, so data must be anchored to the executable's own
+    location instead.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+DATA_DIR = os.path.join(get_app_dir(), "data")
+DB_PATH = os.path.join(DATA_DIR, "index.db")
 
 # Lazy-loaded model
 _model = None
@@ -22,7 +38,7 @@ def get_model():
 # -------------------------
 
 def get_conn():
-    os.makedirs("data", exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
 

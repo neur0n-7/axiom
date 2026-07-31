@@ -1,5 +1,6 @@
 import time
 import os
+import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -62,7 +63,25 @@ class Handler(FileSystemEventHandler):
 # START SERVICE
 # -------------------------
 
+def start_watcher_background():
+    """Kick off the initial index + filesystem watcher without blocking the
+    caller. Used by the FastAPI process (main.py) so a single sidecar does
+    both indexing and serving search requests."""
+
+    def _run():
+        initial_index()
+        root = get_root()
+        observer = Observer()
+        observer.schedule(Handler(), root, recursive=True)
+        observer.start()
+        print(f"🚀 File watcher running on: {root}")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def start_service():
+    """Blocking standalone entrypoint, kept for running `python service.py`
+    directly outside of the Tauri sidecar."""
     init_db()
     initial_index()
 
