@@ -3,6 +3,29 @@
 A local desktop search app for your files. Axiom indexes a folder you choose
 and lets you search it by keyword, by meaning (semantic), or a blend of both. Axiom does not send any data to leave your machine.
 
+<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; border: none;">
+  <tr style="border: none;">
+    <td align="center" valign="top" style="border: none; padding: 0 10px 15px 10px;">
+      <img src="docs/window.png" height="200" alt="Window"><br />
+      <sub><i>An empty Axiom window</i></sub>
+    </td>
+    <td align="center" valign="top" style="border: none; padding: 0 10px 15px 10px;">
+      <img src="docs/settings.png" height="200" alt="Settings page"><br />
+      <sub><i>The settings page</i></sub>
+    </td>
+  </tr>
+  
+  <tr style="border: none;">
+    <td colspan="2" align="center" valign="top" style="border: none; padding: 0 10px;">
+      <img src="docs/example-search.png" width="100%" alt="Example search"><br />
+      <sub><i>An example search: "cooking instructions" located a file that contains neither of those words, but has the same meaning</i></sub>
+    </td>
+  </tr>
+</table>
+
+
+
+
 <br clear="right" />
 
 ## Features

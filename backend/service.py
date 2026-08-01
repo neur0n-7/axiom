@@ -6,7 +6,7 @@ from watchdog.events import FileSystemEventHandler
 
 from indexer import (
     read_file, upsert_file, upsert_files_batch, INDEX_BATCH_SIZE,
-    delete_file, get_mtime, clear_index,
+    delete_file, delete_path_prefix, get_mtime, clear_index,
     get_stored_mtimes, init_db, scan_files, get_config, get_default_root,
     ALLOWED_EXTENSIONS, DATA_DIR
 )
@@ -68,6 +68,10 @@ def initial_index():
     to_index = [(p, get_mtime(p)) for p in files]
     to_index = [(p, m) for p, m in to_index if stored.get(p) != m]
 
+    stale = set(stored) - set(files)
+    for path in stale:
+        delete_file(path)
+
     _set_progress(indexing=True, total=len(to_index), done=0)
 
     def mark_done(_path):
@@ -98,7 +102,12 @@ class Handler(FileSystemEventHandler):
             self.update(event.src_path)
 
     def on_deleted(self, event):
-        if not event.is_directory and not _is_ignored(event.src_path):
+        if _is_ignored(event.src_path):
+            return
+        if event.is_directory:
+            delete_path_prefix(event.src_path)
+            print(f"DELETED DIR: {event.src_path}")
+        else:
             delete_file(event.src_path)
             print(f"DELETED: {event.src_path}")
 

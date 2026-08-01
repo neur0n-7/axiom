@@ -366,6 +366,21 @@ def delete_file(path):
     conn.close()
 
 
+def delete_path_prefix(dir_path):
+    """Remove every indexed file under a deleted directory. Watchdog only
+    fires one on_deleted event for the directory itself, not for each file
+    inside it, so a plain delete_file(path) misses everything it contained."""
+    prefix = os.path.join(dir_path, "")
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("DELETE FROM files WHERE path LIKE ? ESCAPE '\\'",
+              (prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%",))
+    c.execute("DELETE FROM chunks WHERE path LIKE ? ESCAPE '\\'",
+              (prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%",))
+    conn.commit()
+    conn.close()
+
+
 def get_stored_mtimes():
     """Map of path -> stored modified time, so reindexing can skip files
     that haven't changed since they were last embedded."""
@@ -450,10 +465,24 @@ def semantic_search(query: str, limit: int = 10):
     matrix = np.frombuffer(b"".join(r[2] for r in rows), dtype=np.float32).reshape(len(rows), EMBED_DIM)
     sims = matrix @ query_vec  # already normalized -> cosine similarity
 
+    query_l = query.lower()
+    query_terms = query_l.split()
+
     # Keep only the best-scoring chunk per file
     best_by_path = {}
     for i, (path, chunk_index, _) in enumerate(rows):
         score = float(sims[i])
+
+        # Cosine similarity alone ignores the filename, so an exact/partial
+        # filename match (e.g. searching "readme" should favor README.md)
+        # gets a boost on top of the embedding score.
+        path_l = path.lower()
+        filename = os.path.basename(path_l)
+        if query_l in path_l:
+            score += 0.25
+        if any(term and term in filename for term in query_terms):
+            score += 0.15
+
         if path not in best_by_path or score > best_by_path[path][0]:
             best_by_path[path] = (score, chunk_index)
 
