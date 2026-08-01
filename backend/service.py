@@ -25,6 +25,18 @@ _DATA_DIR_ABS = os.path.abspath(DATA_DIR) + os.sep
 def _is_app_data_path(path):
     return os.path.abspath(path).startswith(_DATA_DIR_ABS)
 
+
+def _is_hidden_path(path):
+    """True if any directory component is dot-prefixed (.git, .idea, etc.).
+    Mirrors scan_files()'s dotfile skip so live watcher events stay
+    consistent with what a full reindex would include."""
+    return any(part.startswith(".") for part in os.path.normpath(path).split(os.sep)[:-1])
+
+
+def _is_ignored(path):
+    return _is_app_data_path(path) or _is_hidden_path(path)
+
+
 _progress_lock = threading.Lock()
 _progress = {"indexing": False, "total": 0, "done": 0}
 
@@ -78,15 +90,15 @@ def initial_index():
 class Handler(FileSystemEventHandler):
 
     def on_created(self, event):
-        if not event.is_directory and not _is_app_data_path(event.src_path):
+        if not event.is_directory and not _is_ignored(event.src_path):
             self.update(event.src_path)
 
     def on_modified(self, event):
-        if not event.is_directory and not _is_app_data_path(event.src_path):
+        if not event.is_directory and not _is_ignored(event.src_path):
             self.update(event.src_path)
 
     def on_deleted(self, event):
-        if not event.is_directory and not _is_app_data_path(event.src_path):
+        if not event.is_directory and not _is_ignored(event.src_path):
             delete_file(event.src_path)
             print(f"DELETED: {event.src_path}")
 

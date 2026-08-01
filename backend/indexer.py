@@ -171,6 +171,12 @@ def scan_files(root_dir: str, exclude_patterns: list[str] = None):
         # otherwise e.g. "distillation-notes" gets excluded by "dist")
         dirs[:] = [d for d in dirs if d.lower() not in excludes_lower]
 
+        # Skip hidden/dotfile directories (.git, .idea, .vscode, .ssh, .aws,
+        # etc.) - almost always tooling/config, not content worth searching,
+        # and this also keeps things like .ssh/.aws credentials out of the
+        # index by default.
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+
         # Never walk into the app's own data dir (index.db lives there) -
         # relevant when the search root happens to contain this project
         # folder, e.g. indexing a whole Desktop that axiom sits on.
