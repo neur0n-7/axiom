@@ -5,9 +5,13 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 from indexer import (
-    read_file, upsert_file, delete_file, get_mtime,
-    init_db, scan_files, get_config, get_default_root, ALLOWED_EXTENSIONS
+    read_file, upsert_file, delete_file, get_mtime, clear_index,
+    get_stored_mtimes, init_db, scan_files, get_config, get_default_root,
+    ALLOWED_EXTENSIONS
 )
+
+_observer = None
+_observer_lock = threading.Lock()
 
 
 def get_root():
@@ -22,10 +26,18 @@ def initial_index():
     root = get_root()
     print(f"🔄 Initial indexing of: {root}")
     files = scan_files(root)
+    stored = get_stored_mtimes()
+
+    indexed = 0
     for path in files:
+        mtime = get_mtime(path)
+        if stored.get(path) == mtime:
+            continue  # unchanged since last run — skip re-reading/re-embedding
         content = read_file(path)
-        upsert_file(path, content, get_mtime(path))
-    print(f"✅ Indexed {len(files)} files")
+        upsert_file(path, content, mtime)
+        indexed += 1
+
+    print(f"✅ Indexed {indexed} changed files ({len(files) - indexed} unchanged, skipped)")
 
 
 # -------------------------
@@ -60,6 +72,28 @@ class Handler(FileSystemEventHandler):
 
 
 # -------------------------
+# OBSERVER MANAGEMENT
+# -------------------------
+
+def _start_observer(root):
+    global _observer
+    observer = Observer()
+    observer.schedule(Handler(), root, recursive=True)
+    observer.start()
+    with _observer_lock:
+        _observer = observer
+
+
+def _stop_observer():
+    global _observer
+    with _observer_lock:
+        if _observer is not None:
+            _observer.stop()
+            _observer.join()
+            _observer = None
+
+
+# -------------------------
 # START SERVICE
 # -------------------------
 
@@ -71,12 +105,22 @@ def start_watcher_background():
     def _run():
         initial_index()
         root = get_root()
-        observer = Observer()
-        observer.schedule(Handler(), root, recursive=True)
-        observer.start()
+        _start_observer(root)
         print(f"🚀 File watcher running on: {root}")
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def reindex_all():
+    """Wipe the index and rebuild it from the (possibly new) root_dir, then
+    point the watcher at that directory. Called when root_dir changes so
+    results from the old directory don't keep showing up."""
+    _stop_observer()
+    clear_index()
+    initial_index()
+    root = get_root()
+    _start_observer(root)
+    print(f"🚀 File watcher running on: {root}")
 
 
 def start_service():

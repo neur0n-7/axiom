@@ -27,7 +27,7 @@ export default function App() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<SearchMode>("hybrid");
+  const [mode, setMode] = useState<SearchMode>("semantic");
 
   const [config, setConfig] = useState<Config>({ root_dir: "", exclude_patterns: [] });
   const [draft, setDraft] = useState<Config>({ root_dir: "", exclude_patterns: [] });
@@ -39,6 +39,16 @@ export default function App() {
       .then((r) => r.json())
       .then((d: Config) => { setConfig(d); setDraft(d); })
       .catch(() => {});
+  }, []);
+
+  // The static #splash overlay in index.html covers the gap between the
+  // window opening and this component's first paint. Fade it out now that
+  // there's real content underneath it.
+  useEffect(() => {
+    const splash = document.getElementById("splash");
+    if (!splash) return;
+    splash.style.opacity = "0";
+    setTimeout(() => splash.remove(), 200);
   }, []);
 
   async function search(q: string, m: SearchMode) {
@@ -205,7 +215,7 @@ export default function App() {
               <span className="setting-label">Search directory</span>
               <span className="setting-hint">
                 The folder Axiom indexes. Defaults to your Downloads folder.
-                Restart the service after changing.
+                Saving rebuilds the index automatically.
               </span>
               <input
                 className="setting-input"
@@ -256,7 +266,7 @@ export default function App() {
               {saved ? "Saved" : "Save changes"}
             </button>
             <span className="settings-note">
-              Restart the indexer for directory changes to take effect.
+              Changing the directory triggers a full reindex in the background.
             </span>
           </div>
         </div>

@@ -11,9 +11,9 @@
   --text-2: #6b6b68;
   --text-3: #a3a39f;
 
-  --accent: #534ab7;
-  --accent-bg: rgba(83, 74, 183, 0.08);
-  --accent-border: rgba(83, 74, 183, 0.22);
+  --accent: #a1750a;
+  --accent-bg: rgba(161, 117, 10, 0.08);
+  --accent-border: rgba(161, 117, 10, 0.22);
 
   --danger: #a32d2d;
 
@@ -27,21 +27,44 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #18181a;
-    --surface: #222225;
-    --surface-2: #2a2a2e;
+    --bg: #101011;
+    --surface: #1a1a1c;
+    --surface-2: #222224;
     --border: rgba(255, 255, 255, 0.07);
     --border-strong: rgba(255, 255, 255, 0.13);
     --text: #ededea;
     --text-2: #8c8c88;
     --text-3: #55554f;
-    --accent: #9f99e8;
-    --accent-bg: rgba(159, 153, 232, 0.1);
-    --accent-border: rgba(159, 153, 232, 0.2);
+    --accent: #e0b83d;
+    --accent-bg: rgba(224, 184, 61, 0.1);
+    --accent-border: rgba(224, 184, 61, 0.25);
   }
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── SCROLLBAR ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-3);
+  background-clip: padding-box;
+}
 
 html, body, #root {
   height: 100%;
@@ -452,7 +475,7 @@ html, body, #root {
   background: var(--accent);
   border: none;
   border-radius: var(--radius-sm);
-  color: #fff;
+  color: #1a1500;
   font-family: var(--font);
   font-size: 13px;
   font-weight: 500;

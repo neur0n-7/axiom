@@ -19,7 +19,8 @@ from indexer import (
     init_db, simple_search, semantic_search, hybrid_search,
     get_config, set_config, get_default_root, DEFAULT_EXCLUDES
 )
-from service import start_watcher_background
+import threading
+from service import start_watcher_background, reindex_all
 
 app = FastAPI()
 
@@ -96,10 +97,21 @@ def get_config_endpoint():
 
 @app.post("/config")
 def set_config_endpoint(payload: ConfigPayload):
+    root_changed = (
+        payload.root_dir is not None
+        and payload.root_dir != get_config("root_dir", get_default_root())
+    )
+
     if payload.root_dir is not None:
         set_config("root_dir", payload.root_dir)
     if payload.exclude_patterns is not None:
         set_config("exclude_patterns", payload.exclude_patterns)
+
+    if root_changed:
+        # Wipe stale entries from the old directory and rebuild in the
+        # background so this request returns immediately.
+        threading.Thread(target=reindex_all, daemon=True).start()
+
     return {"status": "saved"}
 
 

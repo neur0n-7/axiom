@@ -13,9 +13,11 @@
     "windows": [
       {
         "title": "Axiom",
-        "width": 800,
-        "height": 200,
-        "resizable": false,
+        "width": 1100,
+        "height": 750,
+        "minWidth": 700,
+        "minHeight": 450,
+        "resizable": true,
         "center": true
       }
     ],

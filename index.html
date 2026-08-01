@@ -7,11 +7,51 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <title>Tauri + React + Typescript</title>
+    <title>Axiom</title>
+    <style>
+      /* Inlined so the window shows the right background immediately,
+         instead of the default black/white flash while App.css and fonts
+         are still loading over the network. Values mirror App.css's
+         --bg/--text-3/--accent so the handoff to the real UI is seamless. */
+      html, body { height: 100%; margin: 0; background: #f4f4f2; }
+      #splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: #f4f4f2;
+        font-family: system-ui, sans-serif;
+        color: #a3a39f;
+        transition: opacity 0.2s ease;
+      }
+      #splash .spinner {
+        width: 22px;
+        height: 22px;
+        border: 2px solid rgba(128, 128, 128, 0.25);
+        border-top-color: #a1750a;
+        border-radius: 50%;
+        animation: splash-spin 0.7s linear infinite;
+      }
+      #splash .splash-label { font-size: 13px; letter-spacing: 0.02em; }
+      @keyframes splash-spin { to { transform: rotate(360deg); } }
+
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #101011; }
+        #splash { background: #101011; color: #55554f; }
+        #splash .spinner { border-top-color: #e0b83d; }
+      }
+    </style>
   </head>
 
   <body>
     <div id="root"></div>
+    <div id="splash">
+      <div class="spinner"></div>
+      <span class="splash-label">Axiom</span>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

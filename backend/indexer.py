@@ -232,6 +232,17 @@ def upsert_file(path, content, modified, compute_embedding=True):
     conn.close()
 
 
+def clear_index():
+    """Wipe all indexed files/chunks. Used when the search root changes so
+    stale entries from the old directory don't linger in results."""
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("DELETE FROM files")
+    c.execute("DELETE FROM chunks")
+    conn.commit()
+    conn.close()
+
+
 def delete_file(path):
     conn = get_conn()
     c = conn.cursor()
@@ -239,6 +250,17 @@ def delete_file(path):
     c.execute("DELETE FROM chunks WHERE path=?", (path,))
     conn.commit()
     conn.close()
+
+
+def get_stored_mtimes():
+    """Map of path -> stored modified time, so reindexing can skip files
+    that haven't changed since they were last embedded."""
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT path, modified FROM files")
+    rows = c.fetchall()
+    conn.close()
+    return dict(rows)
 
 
 def load_index():
