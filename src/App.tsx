@@ -42,9 +42,11 @@ export default function App() {
   }, []);
 
   // The static #splash overlay in index.html covers the gap between the
-  // window opening and this component's first paint. Fade it out now that
-  // there's real content underneath it.
+  // window opening and this component's first paint. Fade it out and let
+  // the real app animate in underneath it, instead of just popping in.
+  const [ready, setReady] = useState(false);
   useEffect(() => {
+    setReady(true);
     const splash = document.getElementById("splash");
     if (!splash) return;
     splash.style.opacity = "0";
@@ -100,7 +102,7 @@ export default function App() {
   const onSettings = screen === "settings";
 
   return (
-    <div className="app">
+    <div className={`app ${ready ? "ready" : ""}`}>
       {/* ── SEARCH SCREEN ── */}
       <div className={`screen screen-search ${onSettings ? "exit" : ""}`}>
         <div className="header">
