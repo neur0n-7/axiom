@@ -13,6 +13,19 @@ from indexer import (
 _observer = None
 _observer_lock = threading.Lock()
 
+_progress_lock = threading.Lock()
+_progress = {"indexing": False, "total": 0, "done": 0}
+
+
+def get_progress():
+    with _progress_lock:
+        return dict(_progress)
+
+
+def _set_progress(**kwargs):
+    with _progress_lock:
+        _progress.update(kwargs)
+
 
 def get_root():
     return get_config("root_dir", get_default_root())
@@ -28,16 +41,19 @@ def initial_index():
     files = scan_files(root)
     stored = get_stored_mtimes()
 
-    indexed = 0
-    for path in files:
-        mtime = get_mtime(path)
-        if stored.get(path) == mtime:
-            continue  # unchanged since last run — skip re-reading/re-embedding
+    to_index = [(p, get_mtime(p)) for p in files]
+    to_index = [(p, m) for p, m in to_index if stored.get(p) != m]
+
+    _set_progress(indexing=True, total=len(to_index), done=0)
+
+    for path, mtime in to_index:
         content = read_file(path)
         upsert_file(path, content, mtime)
-        indexed += 1
+        with _progress_lock:
+            _progress["done"] += 1
 
-    print(f"✅ Indexed {indexed} changed files ({len(files) - indexed} unchanged, skipped)")
+    _set_progress(indexing=False)
+    print(f"✅ Indexed {len(to_index)} changed files ({len(files) - len(to_index)} unchanged, skipped)")
 
 
 # -------------------------
@@ -120,7 +136,7 @@ def reindex_all():
     initial_index()
     root = get_root()
     _start_observer(root)
-    print(f"🚀 File watcher running on: {root}")
+    print(f"File watcher running on: {root}")
 
 
 def start_service():
@@ -130,7 +146,7 @@ def start_service():
     initial_index()
 
     root = get_root()
-    print(f"🚀 File watcher running on: {root}")
+    print(f"File watcher running on: {root}")
 
     observer = Observer()
     observer.schedule(Handler(), root, recursive=True)

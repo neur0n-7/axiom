@@ -20,7 +20,7 @@ from indexer import (
     get_config, set_config, get_default_root, DEFAULT_EXCLUDES
 )
 import threading
-from service import start_watcher_background, reindex_all
+from service import start_watcher_background, reindex_all, get_progress
 
 app = FastAPI()
 
@@ -39,15 +39,23 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
-    print("⚡ Initializing DB...")
+    print("Initializing DB...")
     init_db()
-    start_watcher_background()
-    print("✅ Ready")
+    if get_config("root_dir") is not None:
+        start_watcher_background()
+    else:
+        print("No search directory configured yet - waiting for first-run setup")
+    print("Ready")
 
 
 @app.get("/")
 def root():
     return {"status": "Axiom backend running"}
+
+
+@app.get("/status")
+def status_endpoint():
+    return get_progress()
 
 
 # -------------------------
@@ -92,14 +100,18 @@ def get_config_endpoint():
     return {
         "root_dir": get_config("root_dir", get_default_root()),
         "exclude_patterns": get_config("exclude_patterns", DEFAULT_EXCLUDES),
+        "is_first_run": get_config("root_dir") is None,
     }
 
 
 @app.post("/config")
 def set_config_endpoint(payload: ConfigPayload):
+    # Compare against the raw stored value (no default fallback) so the
+    # very first save always counts as a change, even if the user picks
+    # the same folder get_default_root() would've suggested anyway.
     root_changed = (
         payload.root_dir is not None
-        and payload.root_dir != get_config("root_dir", get_default_root())
+        and payload.root_dir != get_config("root_dir")
     )
 
     if payload.root_dir is not None:

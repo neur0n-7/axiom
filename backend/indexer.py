@@ -19,8 +19,20 @@ def get_app_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def get_bundle_dir():
+    """Directory bundled read-only resources (like the embedding model)
+    live in. In a PyInstaller onefile build this is the temp extraction
+    dir (_MEIPASS), which is NOT the same as the exe's own directory, so
+    this is kept separate from get_app_dir()."""
+    if getattr(sys, "frozen", False):
+        return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 DATA_DIR = os.path.join(get_app_dir(), "data")
 DB_PATH = os.path.join(DATA_DIR, "index.db")
+
+MODEL_NAME = "all-MiniLM-L6-v2"
 
 # Lazy-loaded model
 _model = None
@@ -29,7 +41,11 @@ def get_model():
     global _model
     if _model is None:
         from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        # Prefer the bundled copy (see build_sidecar.ps1) so search works
+        # offline; fall back to the HF Hub name for local dev, where it's
+        # cached normally after the first download.
+        bundled = os.path.join(get_bundle_dir(), "model_cache", MODEL_NAME)
+        _model = SentenceTransformer(bundled if os.path.isdir(bundled) else MODEL_NAME)
     return _model
 
 

@@ -1,11 +1,18 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 
 type SearchResult = { title: string; snippet: string; path: string };
 type BackendResult = { path?: string; snippet?: string; score?: number };
 type SearchMode = "hybrid" | "keyword" | "semantic";
-type Screen = "search" | "settings";
-type Config = { root_dir: string; exclude_patterns: string[] };
+type Screen = "onboarding" | "search" | "settings";
+type Config = { root_dir: string; exclude_patterns: string[]; is_first_run?: boolean };
+type Progress = { indexing: boolean; total: number; done: number };
+
+async function pickDirectory(): Promise<string | null> {
+  const selected = await open({ directory: true, multiple: false });
+  return typeof selected === "string" ? selected : null;
+}
 
 function toSearchResult(item: BackendResult): SearchResult {
   const path = item.path ?? "";
@@ -33,25 +40,66 @@ export default function App() {
   const [draft, setDraft] = useState<Config>({ root_dir: "", exclude_patterns: [] });
   const [newExclude, setNewExclude] = useState("");
   const [saved, setSaved] = useState(false);
+  const [progress, setProgress] = useState<Progress>({ indexing: false, total: 0, done: 0 });
+  const [onboardPicking, setOnboardPicking] = useState(false);
+  const [ready, setReady] = useState(false);
 
+  // Config load also decides whether to show onboarding, and gates removal
+  // of the #splash overlay so there's no flash of the wrong screen.
   useEffect(() => {
     fetch("http://localhost:8000/config")
       .then((r) => r.json())
-      .then((d: Config) => { setConfig(d); setDraft(d); })
-      .catch(() => {});
+      .then((d: Config) => {
+        setConfig(d);
+        setDraft(d);
+        if (d.is_first_run) setScreen("onboarding");
+      })
+      .catch(() => {})
+      .finally(() => {
+        setReady(true);
+        const splash = document.getElementById("splash");
+        if (!splash) return;
+        splash.style.opacity = "0";
+        setTimeout(() => splash.remove(), 200);
+      });
   }, []);
 
-  // The static #splash overlay in index.html covers the gap between the
-  // window opening and this component's first paint. Fade it out and let
-  // the real app animate in underneath it, instead of just popping in.
-  const [ready, setReady] = useState(false);
   useEffect(() => {
-    setReady(true);
-    const splash = document.getElementById("splash");
-    if (!splash) return;
-    splash.style.opacity = "0";
-    setTimeout(() => splash.remove(), 200);
+    let cancelled = false;
+    const poll = () => {
+      fetch("http://localhost:8000/status")
+        .then((r) => r.json())
+        .then((d: Progress) => { if (!cancelled) setProgress(d); })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 600);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
+
+  async function completeOnboarding() {
+    setOnboardPicking(true);
+    try {
+      const dir = await pickDirectory();
+      if (!dir) return;
+      await fetch("http://localhost:8000/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ root_dir: dir }),
+      });
+      const next = { ...config, root_dir: dir, is_first_run: false };
+      setConfig(next);
+      setDraft(next);
+      setScreen("search");
+    } finally {
+      setOnboardPicking(false);
+    }
+  }
+
+  async function browseForDirectory() {
+    const dir = await pickDirectory();
+    if (dir) setDraft((d) => ({ ...d, root_dir: dir }));
+  }
 
   async function search(q: string, m: SearchMode) {
     if (!q.trim()) { setResults([]); setError(null); return; }
@@ -66,7 +114,7 @@ export default function App() {
       setResults((data.results ?? []).map(toSearchResult));
     } catch {
       setResults([]);
-      setError("Backend unreachable — is the server running?");
+      setError("Backend unreachable - is the server running?");
     } finally {
       setLoading(false);
     }
@@ -103,6 +151,26 @@ export default function App() {
 
   return (
     <div className={`app ${ready ? "ready" : ""}`}>
+      {/* ── ONBOARDING SCREEN ── */}
+      {screen === "onboarding" && (
+        <div className="screen screen-onboarding">
+          <div className="onboarding-body">
+            <span className="wordmark onboarding-wordmark">Axiom</span>
+            <p className="onboarding-copy">
+              Pick a folder for Axiom to index and search. You can change this
+              later in Settings.
+            </p>
+            <button
+              className="save-btn"
+              onClick={completeOnboarding}
+              disabled={onboardPicking}
+            >
+              {onboardPicking ? "Choosing…" : "Choose folder"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── SEARCH SCREEN ── */}
       <div className={`screen screen-search ${onSettings ? "exit" : ""}`}>
         <div className="header">
@@ -166,6 +234,22 @@ export default function App() {
             </div>
           )}
 
+          {progress.indexing && (
+            <div className="index-progress">
+              <div className="index-progress-track">
+                <div
+                  className="index-progress-fill"
+                  style={{
+                    width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+              <span className="index-progress-label">
+                Indexing {progress.done}/{progress.total}…
+              </span>
+            </div>
+          )}
+
           <div className="results">
             {loading && (
               <div className="status-row">
@@ -219,12 +303,17 @@ export default function App() {
                 The folder Axiom indexes. Defaults to your Downloads folder.
                 Saving rebuilds the index automatically.
               </span>
-              <input
-                className="setting-input"
-                value={draft.root_dir}
-                onChange={(e) => setDraft((d) => ({ ...d, root_dir: e.target.value }))}
-                placeholder="e.g. C:\Users\you\Documents"
-              />
+              <div className="directory-picker-row">
+                <input
+                  className="setting-input"
+                  value={draft.root_dir}
+                  readOnly
+                  placeholder="No folder selected"
+                />
+                <button className="add-btn" onClick={browseForDirectory}>
+                  Browse…
+                </button>
+              </div>
             </div>
           </div>
 

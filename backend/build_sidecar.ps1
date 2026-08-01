@@ -12,6 +12,15 @@ Write-Host "Target triple: $targetTriple"
 $python = Join-Path $root "venv\Scripts\python.exe"
 & $python -m pip install --quiet --upgrade pyinstaller
 
+$modelDir = Join-Path $root "model_cache\all-MiniLM-L6-v2"
+if (-not (Test-Path $modelDir)) {
+    Write-Host "Downloading embedding model for offline bundling..."
+    & $python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2').save('model_cache/all-MiniLM-L6-v2')"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to download embedding model"
+    }
+}
+
 & $python -m PyInstaller `
     --noconfirm `
     --clean `
@@ -35,6 +44,7 @@ $python = Join-Path $root "venv\Scripts\python.exe"
     --collect-all tokenizers `
     --collect-all safetensors `
     --collect-all huggingface_hub `
+    --add-data "model_cache\all-MiniLM-L6-v2;model_cache\all-MiniLM-L6-v2" `
     main.py
 
 if ($LASTEXITCODE -ne 0) {

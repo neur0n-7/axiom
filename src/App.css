@@ -130,6 +130,32 @@ html, body, #root {
   pointer-events: all;
 }
 
+/* ── ONBOARDING ── */
+.screen-onboarding {
+  z-index: 60;
+  background: var(--bg);
+  align-items: center;
+  justify-content: center;
+  padding: 0 32px;
+}
+
+.onboarding-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 360px;
+  text-align: center;
+}
+
+.onboarding-wordmark { font-size: 20px; }
+
+.onboarding-copy {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
 /* ── SHARED HEADER ── */
 .header {
   position: sticky;
@@ -311,6 +337,32 @@ html, body, #root {
   opacity: 0.8;
 }
 
+/* ── INDEXING PROGRESS ── */
+.index-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.index-progress-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.index-progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+.index-progress-label { white-space: nowrap; flex-shrink: 0; }
+
 /* ── STATUS ── */
 .status-row {
   display: flex;
@@ -456,6 +508,15 @@ html, body, #root {
 
 .exclude-add-row { display: flex; gap: 6px; }
 .exclude-add-input { flex: 1; }
+
+.directory-picker-row { display: flex; gap: 6px; margin-top: 4px; }
+.directory-picker-row .setting-input {
+  flex: 1;
+  margin-top: 0;
+  cursor: default;
+  color: var(--text-2);
+}
+.directory-picker-row .add-btn { flex-shrink: 0; }
 
 .add-btn {
   padding: 7px 12px;
