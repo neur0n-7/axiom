@@ -8,11 +8,22 @@ from indexer import (
     read_file, upsert_file, upsert_files_batch, INDEX_BATCH_SIZE,
     delete_file, get_mtime, clear_index,
     get_stored_mtimes, init_db, scan_files, get_config, get_default_root,
-    ALLOWED_EXTENSIONS
+    ALLOWED_EXTENSIONS, DATA_DIR
 )
 
 _observer = None
 _observer_lock = threading.Lock()
+
+# The search root can contain the app's own project folder
+# (e.g. indexing your whole Desktop, with axiom/ sitting on it). DATA_DIR
+# holds index.db, whose WAL/SHM journal files churn constantly - watching
+# them would otherwise cause an endless loop of spurious delete/update
+# events for files that were never part of the index in the first place.
+_DATA_DIR_ABS = os.path.abspath(DATA_DIR) + os.sep
+
+
+def _is_app_data_path(path):
+    return os.path.abspath(path).startswith(_DATA_DIR_ABS)
 
 _progress_lock = threading.Lock()
 _progress = {"indexing": False, "total": 0, "done": 0}
@@ -67,15 +78,15 @@ def initial_index():
 class Handler(FileSystemEventHandler):
 
     def on_created(self, event):
-        if not event.is_directory:
+        if not event.is_directory and not _is_app_data_path(event.src_path):
             self.update(event.src_path)
 
     def on_modified(self, event):
-        if not event.is_directory:
+        if not event.is_directory and not _is_app_data_path(event.src_path):
             self.update(event.src_path)
 
     def on_deleted(self, event):
-        if not event.is_directory:
+        if not event.is_directory and not _is_app_data_path(event.src_path):
             delete_file(event.src_path)
             print(f"DELETED: {event.src_path}")
 

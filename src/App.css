@@ -396,7 +396,7 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  cursor: default;
+  cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
   animation: fade-in 0.15s ease both;
 }

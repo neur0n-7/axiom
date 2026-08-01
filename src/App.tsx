@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import "./App.css";
 
 type SearchResult = { title: string; snippet: string; path: string };
@@ -266,6 +267,8 @@ export default function App() {
                 key={i}
                 className="result-card"
                 style={{ animationDelay: `${i * 25}ms` }}
+                onClick={() => revealItemInDir(r.path).catch(() => {})}
+                title="Show in file explorer"
               >
                 <div className="result-header">
                   <span className="result-icon">{getIcon(r.path)}</span>

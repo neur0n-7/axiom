@@ -155,6 +155,9 @@ MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5MB - a stray huge log/data file
 # truncated rather than skipping the file outright.
 
 
+_DATA_DIR_ABS = os.path.abspath(DATA_DIR)
+
+
 def scan_files(root_dir: str, exclude_patterns: list[str] = None):
     if exclude_patterns is None:
         exclude_patterns = get_config("exclude_patterns", DEFAULT_EXCLUDES)
@@ -167,6 +170,11 @@ def scan_files(root_dir: str, exclude_patterns: list[str] = None):
         # Prune excluded dirs in-place (exact name match, not substring --
         # otherwise e.g. "distillation-notes" gets excluded by "dist")
         dirs[:] = [d for d in dirs if d.lower() not in excludes_lower]
+
+        # Never walk into the app's own data dir (index.db lives there) -
+        # relevant when the search root happens to contain this project
+        # folder, e.g. indexing a whole Desktop that axiom sits on.
+        dirs[:] = [d for d in dirs if os.path.abspath(os.path.join(root, d)) != _DATA_DIR_ABS]
 
         for f in filenames:
             if any(f.endswith(ext) for ext in ALLOWED_EXTENSIONS):
