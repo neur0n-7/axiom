@@ -41,6 +41,7 @@ export default function App() {
   const [draft, setDraft] = useState<Config>({ root_dir: "", exclude_patterns: [] });
   const [newExclude, setNewExclude] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [progress, setProgress] = useState<Progress>({ indexing: false, total: 0, done: 0 });
   const [onboardPicking, setOnboardPicking] = useState(false);
   const [ready, setReady] = useState(false);
@@ -127,14 +128,20 @@ export default function App() {
   }, [query, mode]);
 
   async function saveConfig() {
-    await fetch("http://localhost:8000/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft),
-    });
-    setConfig(draft);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      const res = await fetch("http://localhost:8000/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+      setConfig(draft);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 2500);
+    }
   }
 
   function addExclude() {
@@ -360,7 +367,9 @@ export default function App() {
               {saved ? "Saved" : "Save changes"}
             </button>
             <span className="settings-note">
-              Changing the directory triggers a full reindex in the background.
+              {saveError
+                ? "Couldn't save — backend unreachable. Try again."
+                : "Changing the directory triggers a full reindex in the background."}
             </span>
           </div>
         </div>

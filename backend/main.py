@@ -66,7 +66,7 @@ def status_endpoint():
 def search_endpoint(
     q: str = Query(...),
     mode: str = Query(default="hybrid"),  # "keyword" | "semantic" | "hybrid"
-    limit: int = Query(default=10)
+    limit: int = Query(default=10, ge=1, le=100)
 ):
     if not q.strip():
         return {"results": []}
