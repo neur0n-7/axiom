@@ -1,6 +1,6 @@
 <img src="src-tauri/icons/128x128.png" align="right" width="96" />
 
-# Axiom
+# Axiom: Local Semantic Search Desktop App
 
 A local desktop search app for your files. Axiom indexes a folder you choose
 and lets you search it by keyword, by meaning (semantic), or a blend of both. Axiom does not send any data to leave your machine.
