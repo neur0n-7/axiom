@@ -5,7 +5,8 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 from indexer import (
-    read_file, upsert_file, delete_file, get_mtime, clear_index,
+    read_file, upsert_file, upsert_files_batch, INDEX_BATCH_SIZE,
+    delete_file, get_mtime, clear_index,
     get_stored_mtimes, init_db, scan_files, get_config, get_default_root,
     ALLOWED_EXTENSIONS
 )
@@ -46,11 +47,14 @@ def initial_index():
 
     _set_progress(indexing=True, total=len(to_index), done=0)
 
-    for path, mtime in to_index:
-        content = read_file(path)
-        upsert_file(path, content, mtime)
+    def mark_done(_path):
         with _progress_lock:
             _progress["done"] += 1
+
+    for i in range(0, len(to_index), INDEX_BATCH_SIZE):
+        batch = to_index[i:i + INDEX_BATCH_SIZE]
+        items = [(path, read_file(path), mtime) for path, mtime in batch]
+        upsert_files_batch(items, on_file_done=mark_done)
 
     _set_progress(indexing=False)
     print(f"✅ Indexed {len(to_index)} changed files ({len(files) - len(to_index)} unchanged, skipped)")

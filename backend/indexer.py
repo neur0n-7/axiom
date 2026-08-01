@@ -55,7 +55,13 @@ def get_model():
 
 def get_conn():
     os.makedirs(DATA_DIR, exist_ok=True)
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    # WAL + NORMAL trade a small durability window (last commit could be
+    # lost on an OS crash) for far fewer fsyncs per transaction - fine here
+    # since this is a rebuildable search index, not a source of truth.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    return conn
 
 
 def init_db():
@@ -249,6 +255,78 @@ def upsert_file(path, content, modified, compute_embedding=True):
                 )
         except Exception as e:
             print(f"Embedding failed for {path}: {e}")
+
+    conn.commit()
+    conn.close()
+
+
+INDEX_BATCH_SIZE = 32
+
+
+def upsert_files_batch(items, on_file_done=None):
+    """Bulk version of upsert_file for indexing many files at once.
+
+    items: list of (path, content, modified) tuples.
+
+    Two things make this much faster than calling upsert_file() in a loop:
+    1. All chunks across every file in the batch are embedded in a single
+       model.encode() call instead of one call per file - CPU transformer
+       inference has fixed per-call overhead that's poorly amortized at the
+       batch size of 1-2 chunks a single file usually produces.
+    2. Everything is written under one connection/transaction instead of a
+       commit (and fsync) per file.
+
+    on_file_done(path), if given, is called once per file after its rows
+    are staged (before the batch-wide commit) - used for progress reporting
+    without tying it to the actual disk commit.
+    """
+    file_pieces = {}
+    flat_pieces = []
+    piece_owners = []  # (path, chunk_index), parallel to flat_pieces
+
+    for path, content, _modified in items:
+        pieces = chunk_text(content) if content.strip() else []
+        file_pieces[path] = pieces
+        for i, piece in enumerate(pieces):
+            flat_pieces.append(piece)
+            piece_owners.append((path, i))
+
+    vecs_by_owner = {}
+    if flat_pieces:
+        try:
+            vecs = embed_texts(flat_pieces)
+            for owner, vec in zip(piece_owners, vecs):
+                vecs_by_owner[owner] = vec
+        except Exception as e:
+            print(f"Batch embedding failed: {e}")
+
+    conn = get_conn()
+    c = conn.cursor()
+
+    for path, content, modified in items:
+        c.execute("""
+            INSERT INTO files (path, content, modified)
+            VALUES (?, ?, ?)
+            ON CONFLICT(path) DO UPDATE SET
+                content=excluded.content,
+                modified=excluded.modified
+        """, (path, content, modified))
+
+        c.execute("DELETE FROM chunks WHERE path=?", (path,))
+
+        rows = [
+            (path, i, piece, vecs_by_owner[(path, i)].tobytes())
+            for i, piece in enumerate(file_pieces[path])
+            if (path, i) in vecs_by_owner
+        ]
+        if rows:
+            c.executemany(
+                "INSERT INTO chunks (path, chunk_index, content, embedding) VALUES (?, ?, ?, ?)",
+                rows
+            )
+
+        if on_file_done:
+            on_file_done(path)
 
     conn.commit()
     conn.close()
