@@ -143,6 +143,12 @@ DEFAULT_EXCLUDES = [
 # FILE SYSTEM
 # -------------------------
 
+MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5MB - a stray huge log/data file
+# with an allowed extension would otherwise chunk into hundreds of
+# embeddings and dominate indexing time, so content past this point is
+# truncated rather than skipping the file outright.
+
+
 def scan_files(root_dir: str, exclude_patterns: list[str] = None):
     if exclude_patterns is None:
         exclude_patterns = get_config("exclude_patterns", DEFAULT_EXCLUDES)
@@ -166,7 +172,7 @@ def scan_files(root_dir: str, exclude_patterns: list[str] = None):
 def read_file(path: str):
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read()
+            return f.read(MAX_FILE_SIZE_BYTES)
     except:
         return ""
 
