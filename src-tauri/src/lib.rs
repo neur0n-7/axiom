@@ -19,12 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            // In debug builds (`tauri dev`), don't spawn the bundled sidecar
-            // it's a 250MB PyInstaller freeze that doesn't hot-reload and is
-            // slow to rebuild. Run the backend yourself instead:
-            // `axiom-backend\dev.ps1` (uvicorn --reload against the venv).
-            // Release builds still spawn the real sidecar so the packaged
-            // app is self-contained.
+            // debug builds don't spawn the sidecar - run axiom-backend\dev.ps1 instead
             if cfg!(debug_assertions) {
                 println!(
                     "[axiom-backend] debug build: not spawning sidecar - \

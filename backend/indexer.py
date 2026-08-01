@@ -35,18 +35,16 @@ DB_PATH = os.path.join(DATA_DIR, "index.db")
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 # Lazy-loaded model
-_model = None
+model_instance = None
 
 def get_model():
-    global _model
-    if _model is None:
+    global model_instance
+    if model_instance is None:
         from sentence_transformers import SentenceTransformer
-        # Prefer the bundled copy (see build_sidecar.ps1) so search works
-        # offline; fall back to the HF Hub name for local dev, where it's
-        # cached normally after the first download.
+        # prefer the bundled copy (see build_sidecar.ps1) for offline use, else fall back to HF Hub
         bundled = os.path.join(get_bundle_dir(), "model_cache", MODEL_NAME)
-        _model = SentenceTransformer(bundled if os.path.isdir(bundled) else MODEL_NAME)
-    return _model
+        model_instance = SentenceTransformer(bundled if os.path.isdir(bundled) else MODEL_NAME)
+    return model_instance
 
 
 # -------------------------
@@ -149,13 +147,9 @@ DEFAULT_EXCLUDES = [
 # FILE SYSTEM
 # -------------------------
 
-MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5MB - a stray huge log/data file
-# with an allowed extension would otherwise chunk into hundreds of
-# embeddings and dominate indexing time, so content past this point is
-# truncated rather than skipping the file outright.
+MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # truncate huge files instead of skipping them
 
-
-_DATA_DIR_ABS = os.path.abspath(DATA_DIR)
+DATA_DIR_ABS = os.path.abspath(DATA_DIR)
 
 
 def scan_files(root_dir: str, exclude_patterns: list[str] = None):
@@ -167,20 +161,9 @@ def scan_files(root_dir: str, exclude_patterns: list[str] = None):
     excludes_lower = {p.lower() for p in exclude_patterns}
 
     for root, dirs, filenames in os.walk(root_dir):
-        # Prune excluded dirs in-place (exact name match, not substring --
-        # otherwise e.g. "distillation-notes" gets excluded by "dist")
-        dirs[:] = [d for d in dirs if d.lower() not in excludes_lower]
-
-        # Skip hidden/dotfile directories (.git, .idea, .vscode, .ssh, .aws,
-        # etc.) - almost always tooling/config, not content worth searching,
-        # and this also keeps things like .ssh/.aws credentials out of the
-        # index by default.
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
-
-        # Never walk into the app's own data dir (index.db lives there) -
-        # relevant when the search root happens to contain this project
-        # folder, e.g. indexing a whole Desktop that axiom sits on.
-        dirs[:] = [d for d in dirs if os.path.abspath(os.path.join(root, d)) != _DATA_DIR_ABS]
+        dirs[:] = [d for d in dirs if d.lower() not in excludes_lower]  # exact name match, not substring
+        dirs[:] = [d for d in dirs if not d.startswith(".")]  # skip dotfile dirs (.git, .ssh, etc.)
+        dirs[:] = [d for d in dirs if os.path.abspath(os.path.join(root, d)) != DATA_DIR_ABS]  # don't walk our own db dir
 
         for f in filenames:
             if any(f.endswith(ext) for ext in ALLOWED_EXTENSIONS):
@@ -278,27 +261,13 @@ INDEX_BATCH_SIZE = 32
 
 
 def upsert_files_batch(items, on_file_done=None):
-    """Bulk version of upsert_file for indexing many files at once.
-
-    items: list of (path, content, modified) tuples.
-
-    Two things make this much faster than calling upsert_file() in a loop:
-    1. All chunks across every file in the batch are embedded in a single
-       model.encode() call instead of one call per file - CPU transformer
-       inference has fixed per-call overhead that's poorly amortized at the
-       batch size of 1-2 chunks a single file usually produces.
-    2. Everything is written under one connection/transaction instead of a
-       commit (and fsync) per file.
-
-    on_file_done(path), if given, is called once per file after its rows
-    are staged (before the batch-wide commit) - used for progress reporting
-    without tying it to the actual disk commit.
-    """
+    """Bulk version of upsert_file: embeds all chunks in one model call and
+    commits once per batch instead of once per file, so it's much faster."""
     file_pieces = {}
     flat_pieces = []
     piece_owners = []  # (path, chunk_index), parallel to flat_pieces
 
-    for path, content, _modified in items:
+    for path, content, modified in items:
         pieces = chunk_text(content) if content.strip() else []
         file_pieces[path] = pieces
         for i, piece in enumerate(pieces):
@@ -473,9 +442,7 @@ def semantic_search(query: str, limit: int = 10):
     for i, (path, chunk_index, _) in enumerate(rows):
         score = float(sims[i])
 
-        # Cosine similarity alone ignores the filename, so an exact/partial
-        # filename match (e.g. searching "readme" should favor README.md)
-        # gets a boost on top of the embedding score.
+        # boost filename matches - cosine similarity alone ignores the path
         path_l = path.lower()
         filename = os.path.basename(path_l)
         if query_l in path_l:
@@ -508,7 +475,7 @@ def semantic_search(query: str, limit: int = 10):
     return results
 
 
-def _min_max_normalize(scores: list[float]) -> tuple[float, float]:
+def min_max_normalize(scores: list[float]) -> tuple[float, float]:
     """Returns (min, range) so callers can do (score - min) / range, robust to negative scores."""
     if not scores:
         return 0.0, 1.0
@@ -522,10 +489,10 @@ def hybrid_search(query: str, limit: int = 10, semantic_weight: float = 0.5):
     semantic_results = semantic_search(query, limit=50)
 
     kw_map = {r["path"]: r for r in keyword_results}
-    kw_min, kw_range = _min_max_normalize([r["score"] for r in keyword_results])
+    kw_min, kw_range = min_max_normalize([r["score"] for r in keyword_results])
 
     sem_map = {r["path"]: r for r in semantic_results}
-    sem_min, sem_range = _min_max_normalize([r["score"] for r in semantic_results])
+    sem_min, sem_range = min_max_normalize([r["score"] for r in semantic_results])
 
     all_paths = set(kw_map) | set(sem_map)
     merged = []

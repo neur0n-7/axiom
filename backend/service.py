@@ -11,53 +11,45 @@ from indexer import (
     ALLOWED_EXTENSIONS, DATA_DIR
 )
 
-_observer = None
-_observer_lock = threading.Lock()
+active_observer = None
+observer_lock = threading.Lock()
 
-# The search root can contain the app's own project folder
-# (e.g. indexing your whole Desktop, with axiom/ sitting on it). DATA_DIR
-# holds index.db, whose WAL/SHM journal files churn constantly - watching
-# them would otherwise cause an endless loop of spurious delete/update
-# events for files that were never part of the index in the first place.
-_DATA_DIR_ABS = os.path.abspath(DATA_DIR) + os.sep
+# prevent infinite loop from happening by excluding axiom's db
+DATA_DIR_ABS = os.path.abspath(DATA_DIR) + os.sep
 
 
-def _is_app_data_path(path):
-    return os.path.abspath(path).startswith(_DATA_DIR_ABS)
+def is_app_data_path(path):
+    return os.path.abspath(path).startswith(DATA_DIR_ABS)
 
 
-def _is_hidden_path(path):
-    """True if any directory component is dot-prefixed (.git, .idea, etc.).
-    Mirrors scan_files()'s dotfile skip so live watcher events stay
-    consistent with what a full reindex would include."""
+def is_hidden_path(path):
+    # mirrors scan_files()'s dotfile skip so watcher events stay consistent with a full reindex
     return any(part.startswith(".") for part in os.path.normpath(path).split(os.sep)[:-1])
 
 
-def _is_ignored(path):
-    return _is_app_data_path(path) or _is_hidden_path(path)
+def is_ignored(path):
+    return is_app_data_path(path) or is_hidden_path(path)
 
 
-_progress_lock = threading.Lock()
-_progress = {"indexing": False, "total": 0, "done": 0}
+progress_lock = threading.Lock()
+progress = {"indexing": False, "total": 0, "done": 0}
 
 
 def get_progress():
-    with _progress_lock:
-        return dict(_progress)
+    with progress_lock:
+        return dict(progress)
 
 
-def _set_progress(**kwargs):
-    with _progress_lock:
-        _progress.update(kwargs)
+def set_progress(**kwargs):
+    with progress_lock:
+        progress.update(kwargs)
 
 
 def get_root():
     return get_config("root_dir", get_default_root())
 
 
-# -------------------------
-# INITIAL BUILD
-# -------------------------
+# init build #########################################################################
 
 def initial_index():
     root = get_root()
@@ -72,37 +64,36 @@ def initial_index():
     for path in stale:
         delete_file(path)
 
-    _set_progress(indexing=True, total=len(to_index), done=0)
+    set_progress(indexing=True, total=len(to_index), done=0)
 
-    def mark_done(_path):
-        with _progress_lock:
-            _progress["done"] += 1
+    def mark_done(path):
+        with progress_lock:
+            progress["done"] += 1
 
     for i in range(0, len(to_index), INDEX_BATCH_SIZE):
         batch = to_index[i:i + INDEX_BATCH_SIZE]
         items = [(path, read_file(path), mtime) for path, mtime in batch]
         upsert_files_batch(items, on_file_done=mark_done)
 
-    _set_progress(indexing=False)
+    set_progress(indexing=False)
     print(f"✅ Indexed {len(to_index)} changed files ({len(files) - len(to_index)} unchanged, skipped)")
 
 
-# -------------------------
-# WATCHER
-# -------------------------
+# watcher #########################################################################
+
 
 class Handler(FileSystemEventHandler):
 
     def on_created(self, event):
-        if not event.is_directory and not _is_ignored(event.src_path):
+        if not event.is_directory and not is_ignored(event.src_path):
             self.update(event.src_path)
 
     def on_modified(self, event):
-        if not event.is_directory and not _is_ignored(event.src_path):
+        if not event.is_directory and not is_ignored(event.src_path):
             self.update(event.src_path)
 
     def on_deleted(self, event):
-        if _is_ignored(event.src_path):
+        if is_ignored(event.src_path):
             return
         if event.is_directory:
             delete_path_prefix(event.src_path)
@@ -122,62 +113,53 @@ class Handler(FileSystemEventHandler):
         except:
             pass
 
+##########################################################################
 
-# -------------------------
-# OBSERVER MANAGEMENT
-# -------------------------
-
-def _start_observer(root):
-    global _observer
-    observer = Observer()
-    observer.schedule(Handler(), root, recursive=True)
-    observer.start()
-    with _observer_lock:
-        _observer = observer
+def start_observer(root):
+    global active_observer
+    new_observer = Observer()
+    new_observer.schedule(Handler(), root, recursive=True)
+    new_observer.start()
+    with observer_lock:
+        active_observer = new_observer
 
 
-def _stop_observer():
-    global _observer
-    with _observer_lock:
-        if _observer is not None:
-            _observer.stop()
-            _observer.join()
-            _observer = None
+def stop_observer():
+    global active_observer
+    with observer_lock:
+        if active_observer is not None:
+            active_observer.stop()
+            active_observer.join()
+            active_observer = None
 
 
-# -------------------------
-# START SERVICE
-# -------------------------
+##########################################################################
+
 
 def start_watcher_background():
-    """Kick off the initial index + filesystem watcher without blocking the
-    caller. Used by the FastAPI process (main.py) so a single sidecar does
-    both indexing and serving search requests."""
+    # start off the initial index + filesystem watcher without blocking the caller
 
-    def _run():
+    def run():
         initial_index()
         root = get_root()
-        _start_observer(root)
-        print(f"🚀 File watcher running on: {root}")
+        start_observer(root)
+        print(f"File watcher running on: {root}")
 
-    threading.Thread(target=_run, daemon=True).start()
+    threading.Thread(target=run, daemon=True).start()
 
 
 def reindex_all():
-    """Wipe the index and rebuild it from the (possibly new) root_dir, then
-    point the watcher at that directory. Called when root_dir changes so
-    results from the old directory don't keep showing up."""
-    _stop_observer()
+    # wipes and rebuilds the index for a new root_dir, then re-points the watcher
+    stop_observer()
     clear_index()
     initial_index()
     root = get_root()
-    _start_observer(root)
+    start_observer(root)
     print(f"File watcher running on: {root}")
 
 
 def start_service():
-    """Blocking standalone entrypoint, kept for running `python service.py`
-    directly outside of the Tauri sidecar."""
+    # blocking entrypoint for running `python service.py` directly, outside the sidecar
     init_db()
     initial_index()
 

@@ -1,6 +1,4 @@
-# Builds axiom-backend (main.py + the folded-in file watcher) into a single
-# executable and drops it into src-tauri/binaries with the target-triple
-# suffix Tauri's sidecar mechanism expects.
+# Freezes main.py into a sidecar exe and drops it into src-tauri/binaries
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path

@@ -46,8 +46,7 @@ export default function App() {
   const [onboardPicking, setOnboardPicking] = useState(false);
   const [ready, setReady] = useState(false);
 
-  // Config load also decides whether to show onboarding, and gates removal
-  // of the #splash overlay so there's no flash of the wrong screen.
+  // also decides onboarding vs search, and gates removing #splash so there's no flash
   useEffect(() => {
     fetch("http://localhost:8000/config")
       .then((r) => r.json())
@@ -368,7 +367,7 @@ export default function App() {
             </button>
             <span className="settings-note">
               {saveError
-                ? "Couldn't save — backend unreachable. Try again."
+                ? "Couldn't save - backend unreachable. Try again."
                 : "Changing the directory triggers a full reindex in the background."}
             </span>
           </div>

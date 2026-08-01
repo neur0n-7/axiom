@@ -1,13 +1,9 @@
 import multiprocessing
 import sys
-# Must run before any other imports: PyInstaller-frozen executables that
-# spawn subprocesses (torch/sentence-transformers can) need this guard on
-# Windows or they'll re-launch the whole app in a fork bomb.
+
 multiprocessing.freeze_support()
 
-# The bundled exe's stdout/stderr default to the console's codepage (cp1252
-# on Windows), which can't encode the emoji in this file's print()s and
-# crashes startup. Force UTF-8 regardless of what's attached to the streams.
+# force UTF-8
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
@@ -58,14 +54,13 @@ def status_endpoint():
     return get_progress()
 
 
-# -------------------------
-# SEARCH
-# -------------------------
+# search #########################################################################
+
 
 @app.get("/search")
 def search_endpoint(
     q: str = Query(...),
-    mode: str = Query(default="hybrid"),  # "keyword" | "semantic" | "hybrid"
+    mode: str = Query(default="hybrid"),
     limit: int = Query(default=10, ge=1, le=100)
 ):
     if not q.strip():
@@ -86,9 +81,7 @@ def search_endpoint(
     }
 
 
-# -------------------------
-# CONFIG
-# -------------------------
+# config #########################################################################
 
 class ConfigPayload(BaseModel):
     root_dir: Optional[str] = None
@@ -106,9 +99,7 @@ def get_config_endpoint():
 
 @app.post("/config")
 def set_config_endpoint(payload: ConfigPayload):
-    # Compare against the raw stored value (no default fallback) so the
-    # very first save always counts as a change, even if the user picks
-    # the same folder get_default_root() would've suggested anyway.
+    # very first save always counts as a change
     root_changed = (
         payload.root_dir is not None
         and payload.root_dir != get_config("root_dir")
@@ -120,8 +111,7 @@ def set_config_endpoint(payload: ConfigPayload):
         set_config("exclude_patterns", payload.exclude_patterns)
 
     if root_changed:
-        # Wipe stale entries from the old directory and rebuild in the
-        # background so this request returns immediately.
+        # remove stale entries from the old directory
         threading.Thread(target=reindex_all, daemon=True).start()
 
     return {"status": "saved"}
