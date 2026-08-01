@@ -1,7 +1,8 @@
 <img src="docs/banner.png" width="100%" alt="Axiom: Local Semantic Search App" />
 
-A local desktop search app for your files. Axiom indexes a folder you choose
-and lets you search it by keyword, by meaning (semantic), or a blend of both. Axiom does not send any data to leave your machine.
+A private, local AI-powered desktop search app for your files. Axiom indexes a folder you choose and lets you search it by keyword, by meaning (semantic), or a hybrid of both. 
+
+Axiom does not send any data from your machine. All of the action takes place on your own computer.
 
 <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; border: none;">
   <tr style="border: none;">
@@ -23,16 +24,13 @@ and lets you search it by keyword, by meaning (semantic), or a blend of both. Ax
   </tr>
 </table>
 
-
-
-
 <br clear="right" />
 
 ## Features
 
 - **Three search modes** - keyword, semantic, and hybrid (combination of both)
 - **Live indexing** - background file watcher looks for new, edited, and deleted files automatically
-- **Fully local** - the search index (SQLite) and the embedding model run on your machine without anything uploaded to other sites, which is insecure
+- **Fully local** - the search index (SQLite) and the embedding model run on your machine without anything uploaded to other sites
 - **Configurable scope** - pick any folder to index, with exclusion patterns for subfolders you don't want scanned (defaults skip things like `node_modules`, `.git`, `venv`, build output, and other dotfile/config directories)
 - **Reveal in Explorer** - click a search result to open it selected in your system file browser
 
@@ -44,6 +42,18 @@ and lets you search it by keyword, by meaning (semantic), or a blend of both. Ax
   PyInstaller and run as a Tauri sidecar process
 - **Search**: SQLite for storage, [sentence-transformers](https://www.sbert.net/)
   (`all-MiniLM-L6-v2`) for semantic embeddings
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[React frontend] -->|HTTP| Backend[Python/FastAPI sidecar]
+    Shell[Tauri/Rust shell] -->|spawns + manages| Backend
+    Backend -->|reads/writes| DB[(SQLite index)]
+    Backend --> Model[sentence-transformers model]
+    Watcher[File watcher] -->|updates| DB
+    Backend -.->|runs| Watcher
+```
 
 ## Project structure
 
