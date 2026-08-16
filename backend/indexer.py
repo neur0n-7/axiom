@@ -8,22 +8,12 @@ ALLOWED_EXTENSIONS = {".txt", ".py", ".md", ".json", ".js", ".ts"}
 
 
 def get_app_dir():
-    """Directory the backend's data lives next to.
-
-    When frozen by PyInstaller (running as a Tauri sidecar), the process's
-    CWD isn't reliable, so data must be anchored to the executable's own
-    location instead.
-    """
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 
 def get_bundle_dir():
-    """Directory bundled read-only resources (like the embedding model)
-    live in. In a PyInstaller onefile build this is the temp extraction
-    dir (_MEIPASS), which is NOT the same as the exe's own directory, so
-    this is kept separate from get_app_dir()."""
     if getattr(sys, "frozen", False):
         return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
     return os.path.dirname(os.path.abspath(__file__))
@@ -54,9 +44,7 @@ def get_model():
 def get_conn():
     os.makedirs(DATA_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
-    # WAL + NORMAL trade a small durability window (last commit could be
-    # lost on an OS crash) for far fewer fsyncs per transaction - fine here
-    # since this is a rebuildable search index, not a source of truth.
+    # WAL + NORMAL, see my website for explanation
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
@@ -75,7 +63,7 @@ def init_db():
         )
     """)
 
-    # Migrate existing DBs that lack the embedding column
+    # migration for existing DBs
     existing = {row[1] for row in c.execute("PRAGMA table_info(files)")}
     if "embedding" not in existing:
         c.execute("ALTER TABLE files ADD COLUMN embedding BLOB")
@@ -330,9 +318,7 @@ def delete_file(path):
 
 
 def delete_path_prefix(dir_path):
-    """Remove every indexed file under a deleted directory. Watchdog only
-    fires one on_deleted event for the directory itself, not for each file
-    inside it, so a plain delete_file(path) misses everything it contained."""
+    """Remove every indexed file under a deleted directory"""
     prefix = os.path.join(dir_path, "")
     conn = get_conn()
     c = conn.cursor()

@@ -7,7 +7,7 @@ from watchdog.events import FileSystemEventHandler
 from indexer import (
     read_file, upsert_file, upsert_files_batch, INDEX_BATCH_SIZE,
     delete_file, delete_path_prefix, get_mtime, clear_index,
-    get_stored_mtimes, init_db, scan_files, get_config, get_default_root,
+    get_stored_mtimes, init_db, scan_files, get_config,
     ALLOWED_EXTENSIONS, DATA_DIR
 )
 
@@ -46,13 +46,15 @@ def set_progress(**kwargs):
 
 
 def get_root():
-    return get_config("root_dir", get_default_root())
+    return get_config("root_dir")
 
 
 # init build #########################################################################
 
 def initial_index():
     root = get_root()
+    if root is None:
+        return
     print(f"🔄 Initial indexing of: {root}")
     files = scan_files(root)
     stored = get_stored_mtimes()
@@ -161,9 +163,13 @@ def reindex_all():
 def start_service():
     # blocking entrypoint for running `python service.py` directly, outside the sidecar
     init_db()
-    initial_index()
 
     root = get_root()
+    if root is None:
+        print("No search directory configured yet - waiting for first-run setup")
+        return
+
+    initial_index()
     print(f"File watcher running on: {root}")
 
     observer = Observer()

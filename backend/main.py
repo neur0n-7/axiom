@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from indexer import (
     init_db, simple_search, semantic_search, hybrid_search,
-    get_config, set_config, get_default_root, DEFAULT_EXCLUDES
+    get_config, set_config, DEFAULT_EXCLUDES
 )
 import threading
 from service import start_watcher_background, reindex_all, get_progress
@@ -101,7 +101,7 @@ class ConfigPayload(BaseModel):
 @app.get("/config")
 def get_config_endpoint():
     return {
-        "root_dir": get_config("root_dir", get_default_root()),
+        "root_dir": get_config("root_dir", ""),
         "exclude_patterns": get_config("exclude_patterns", DEFAULT_EXCLUDES),
         "is_first_run": get_config("root_dir") is None,
     }
