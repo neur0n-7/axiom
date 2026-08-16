@@ -162,7 +162,8 @@ export default function App() {
       {screen === "onboarding" && (
         <div className="screen screen-onboarding">
           <div className="onboarding-body">
-            <span className="wordmark onboarding-wordmark">Axiom</span>
+            <div className="onboarding-orb" />
+            <span className="wordmark onboarding-wordmark">Get Started with Axiom</span>
             <p className="onboarding-copy">
               Pick a folder for Axiom to index and search. You can change this
               later in Settings.

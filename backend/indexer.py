@@ -4,7 +4,21 @@ import sqlite3
 import json
 import numpy as np
 
-ALLOWED_EXTENSIONS = {".txt", ".py", ".md", ".json", ".js", ".ts"}
+ALLOWED_EXTENSIONS = {
+    # plain text / docs
+    ".txt", ".md", ".markdown", ".rst", ".log", ".csv", ".tsv",
+    # config / data
+    ".json", ".yaml", ".yml", ".toml", ".xml", ".ini", ".cfg", ".conf",
+    ".properties", ".env",
+    # web
+    ".html", ".htm", ".css", ".scss", ".sass", ".less", ".vue", ".svelte",
+    # scripting / shell
+    ".sh", ".bash", ".ps1", ".bat", ".sql",
+    # popular languages
+    ".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".kt", ".c", ".h",
+    ".cpp", ".hpp", ".cs", ".go", ".rs", ".rb", ".php", ".swift",
+    ".scala", ".lua", ".r", ".dart", ".pl", ".m",
+}
 
 
 def get_app_dir():
