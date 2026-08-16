@@ -309,8 +309,7 @@ export default function App() {
             <div className="setting-row">
               <span className="setting-label">Search directory</span>
               <span className="setting-hint">
-                The folder Axiom indexes. Defaults to your Downloads folder.
-                Saving rebuilds the index automatically.
+                The folder Axiom indexes. You are only able to search within this folder.
               </span>
               <div className="directory-picker-row">
                 <input

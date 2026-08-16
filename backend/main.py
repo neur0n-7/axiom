@@ -34,6 +34,15 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def allow_private_network(request, call_next):
+    # Chromium/WebView2 treat the app's origin as "public" and require this
+    # header before allowing fetches to a loopback address like localhost.
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
+
 @app.on_event("startup")
 def startup():
     print("Initializing DB...")

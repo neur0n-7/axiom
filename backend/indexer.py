@@ -129,12 +129,6 @@ def set_config(key: str, value):
     conn.commit()
     conn.close()
 
-
-def get_default_root():
-    """Returns ~/Downloads as a sensible default."""
-    return str(os.path.join(os.path.expanduser("~"), "Downloads"))
-
-
 DEFAULT_EXCLUDES = [
     "node_modules", ".git", "__pycache__", ".venv", "venv",
     "dist", "build", ".next", ".cache", "coverage",
