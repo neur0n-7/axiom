@@ -35,7 +35,7 @@ export default function App() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<SearchMode>("semantic");
+  const [mode, setMode] = useState<SearchMode>("hybrid");
 
   const [config, setConfig] = useState<Config>({ root_dir: "", exclude_patterns: [] });
   const [draft, setDraft] = useState<Config>({ root_dir: "", exclude_patterns: [] });
