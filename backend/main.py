@@ -31,16 +31,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Chromium/WebView2 may treat the app's origin as "public" and send a
+    # private-network preflight before fetching a loopback address.
+    allow_private_network=True,
 )
-
-
-@app.middleware("http")
-async def allow_private_network(request, call_next):
-    # Chromium/WebView2 treat the app's origin as "public" and require this
-    # header before allowing fetches to a loopback address like localhost.
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
-    return response
 
 
 @app.on_event("startup")
